@@ -33,7 +33,6 @@
         <fastjson2.version>2.0.43</fastjson2.version>
         <dozer-core.version>7.0.0</dozer-core.version>
         <hutool-all.version>5.8.30</hutool-all.version>
-        <redisson.version>3.27.2</redisson.version>
         <guava.version>32.0.1-jre</guava.version>
     </properties>
 
@@ -112,12 +111,6 @@
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-all</artifactId>
                 <version>${hutool-all.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.redisson</groupId>
-                <artifactId>redisson-spring-boot-starter</artifactId>
-                <version>${redisson.version}</version>
             </dependency>
 
             <dependency>
