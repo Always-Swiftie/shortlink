@@ -31,7 +31,6 @@
         <shardingsphere.version>5.4.1</shardingsphere.version>
         <jjwt.version>0.9.1</jjwt.version>
         <fastjson2.version>2.0.43</fastjson2.version>
-        <mybatis-plus.version>3.5.3.1</mybatis-plus.version>
         <dozer-core.version>7.0.0</dozer-core.version>
         <hutool-all.version>5.8.30</hutool-all.version>
         <redisson.version>3.27.2</redisson.version>
@@ -39,6 +38,20 @@
     </properties>
 
     <!-- 依赖项管理 -->
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <version>3.5.5</version>
+        </dependency>
+    </dependencies>
+
+
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -63,12 +76,6 @@
                 <version>${spring-cloud-alibaba.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>com.baomidou</groupId>
-                <artifactId>mybatis-plus-boot-starter</artifactId>
-                <version>3.5.2</version>
             </dependency>
 
             <dependency>

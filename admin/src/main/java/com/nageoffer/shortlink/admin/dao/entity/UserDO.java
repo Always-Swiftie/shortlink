@@ -1,5 +1,6 @@
 package com.nageoffer.shortlink.admin.dao.entity;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -8,6 +9,7 @@ import java.time.LocalDateTime;
  * @author 20784
  */
 @Data
+@TableName("t_user")
 public class UserDO {
 
     /** ID */
