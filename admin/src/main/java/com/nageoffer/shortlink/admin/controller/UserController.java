@@ -1,9 +1,9 @@
 package com.nageoffer.shortlink.admin.controller;
 
-import com.nageoffer.shortlink.admin.common.convention.errorcode.BaseErrorCode;
+import cn.hutool.core.bean.BeanUtil;
 import com.nageoffer.shortlink.admin.common.convention.result.Result;
 import com.nageoffer.shortlink.admin.common.convention.result.Results;
-import com.nageoffer.shortlink.admin.common.enums.UserErrorCodeEnum;
+import com.nageoffer.shortlink.admin.dto.resp.UserActualRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.UserRespDTO;
 import com.nageoffer.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,15 @@ public class UserController {
      */
     @GetMapping("/api/shortlink/v1/user/{username}")
     public Result<UserRespDTO> getUserByUsername(@PathVariable("username") String username){
-        UserRespDTO result = userService.getUserByUsername(username);
-        return Results.success(result);
+        return Results.success(userService.getUserByUsername(username));
     }
+
+    /**
+     * 根据用户名查询未脱敏用户信息
+     */
+    @GetMapping("/api/shortlink/v1/user/actual/{username}")
+    public Result<UserActualRespDTO> getUserActualByUsername(@PathVariable("username") String username){
+        return Results.success(BeanUtil.toBean(userService.getUserByUsername(username),UserActualRespDTO.class));
+    }
+
 }
