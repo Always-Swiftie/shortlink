@@ -24,7 +24,6 @@ public class UserInfoDTO {
     /**
      * 用户名
      */
-    @JSONField(name = "id")
     private String username;
 
     /**

@@ -33,6 +33,7 @@ public class UserTransmitFilter implements Filter {
             Object userInfoJsonStr = stringRedisTemplate.opsForHash().get(userLoginKey, token);
             if (userInfoJsonStr != null) {
                 UserInfoDTO userInfoDTO = JSONObject.parseObject((String) userInfoJsonStr, UserInfoDTO.class);
+                UserContext.setUser(userInfoDTO);
             }
         }
         try {

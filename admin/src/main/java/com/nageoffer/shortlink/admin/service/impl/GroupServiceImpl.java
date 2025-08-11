@@ -55,7 +55,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         //TODO 获取当前用户名
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.<GroupDO>lambdaQuery()
                 .eq(BaseDO::getDelFlag,0)
-                .isNull(GroupDO::getUsername)
+                .eq(GroupDO::getUsername,UserContext.getUsername())
                 .orderByDesc(GroupDO::getSortOrder,GroupDO::getUpdateTime);
         List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
         return BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
@@ -72,4 +72,16 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .build();
         baseMapper.update(groupDO,queryWrapper);
     }
+
+    @Override
+    public void deleteGroup(String gid) {
+        LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.<GroupDO>lambdaQuery()
+                .eq(GroupDO::getGid, gid)
+                .eq(GroupDO::getUsername,UserContext.getUsername())
+                .eq(GroupDO::getDelFlag,0);
+        GroupDO groupDO = baseMapper.selectOne(queryWrapper);
+        groupDO.setDelFlag(1);
+        baseMapper.update(groupDO,queryWrapper);
+    }
+
 }
