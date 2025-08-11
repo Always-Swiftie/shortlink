@@ -8,6 +8,7 @@ import com.nageoffer.shortlink.admin.common.biz.user.UserContext;
 import com.nageoffer.shortlink.admin.common.database.BaseDO;
 import com.nageoffer.shortlink.admin.dao.entity.GroupDO;
 import com.nageoffer.shortlink.admin.dao.mapper.GroupMapper;
+import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupSortReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupUpdateReqDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
 import com.nageoffer.shortlink.admin.service.GroupService;
@@ -75,6 +76,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
     @Override
     public void deleteGroup(String gid) {
+        String username = UserContext.getUsername();
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.<GroupDO>lambdaQuery()
                 .eq(GroupDO::getGid, gid)
                 .eq(GroupDO::getUsername,UserContext.getUsername())
@@ -84,4 +86,19 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         baseMapper.update(groupDO,queryWrapper);
     }
 
+    @Override
+    public void sortGroup(List<ShortLinkGroupSortReqDTO> requestParam) {
+        String username = UserContext.getUsername();
+        requestParam.forEach(dto -> {
+            GroupDO groupDO = GroupDO.builder()
+                    .gid(dto.getGid())
+                    .sortOrder(dto.getSortOrder())
+                    .build();
+            LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.<GroupDO>lambdaQuery()
+                    .eq(GroupDO::getGid, dto.getGid())
+                    .eq(GroupDO::getUsername,UserContext.getUsername())
+                    .eq(GroupDO::getDelFlag,0);
+            baseMapper.update(groupDO,queryWrapper);
+        });
+    }
 }
