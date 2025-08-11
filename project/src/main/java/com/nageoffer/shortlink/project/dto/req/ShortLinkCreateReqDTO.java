@@ -23,11 +23,6 @@ public class ShortLinkCreateReqDTO {
     private String domain;
 
     /**
-     * 短链接
-     */
-    private String shortUri;
-
-    /**
      * 原始链接
      */
     private String originUrl;
