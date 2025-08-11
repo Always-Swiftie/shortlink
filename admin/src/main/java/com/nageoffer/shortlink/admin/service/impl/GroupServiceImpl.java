@@ -4,9 +4,11 @@ import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nageoffer.shortlink.admin.common.biz.user.UserContext;
 import com.nageoffer.shortlink.admin.common.database.BaseDO;
 import com.nageoffer.shortlink.admin.dao.entity.GroupDO;
 import com.nageoffer.shortlink.admin.dao.mapper.GroupMapper;
+import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupUpdateReqDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
 import com.nageoffer.shortlink.admin.service.GroupService;
 import com.nageoffer.shortlink.admin.util.CodeGenerator;
@@ -34,6 +36,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .name(groupName)
                 .gid(gid)
                 .sortOrder(0)
+                .username(UserContext.getUsername())
                 .build();
         baseMapper.insert(groupDO);
     }
@@ -56,5 +59,17 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .orderByDesc(GroupDO::getSortOrder,GroupDO::getUpdateTime);
         List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
         return BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
+    }
+
+    @Override
+    public void updateGroup(ShortLinkGroupUpdateReqDTO requestParam) {
+        LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.<GroupDO>lambdaQuery()
+                .eq(GroupDO::getGid, requestParam.getGid())
+                .eq(GroupDO::getUsername,UserContext.getUsername())
+                .eq(GroupDO::getDelFlag,0);
+        GroupDO groupDO = GroupDO.builder()
+                .name(requestParam.getName())
+                .build();
+        baseMapper.update(groupDO,queryWrapper);
     }
 }
