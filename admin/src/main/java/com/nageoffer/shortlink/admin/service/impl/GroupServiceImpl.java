@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 
@@ -36,26 +37,30 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     };
 
     @Override
-    public void save(String groupName) {
+    public void save(String username, String groupName) {
         String gid;
         do {
             gid = CodeGenerator.generateRandomCode();
-        } while (hasGid(gid));
+        } while (hasGid(username,gid));
 
         GroupDO groupDO = GroupDO.builder()
                 .name(groupName)
                 .gid(gid)
                 .sortOrder(0)
-                .username(UserContext.getUsername())
+                .username(username)
                 .build();
         baseMapper.insert(groupDO);
     }
 
-    private boolean hasGid(String gid) {
+    @Override
+    public void save(String groupName) {
+        save(UserContext.getUsername(), groupName);
+    }
+
+    private boolean hasGid(String username,String gid) {
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.<GroupDO>lambdaQuery()
                 .eq(GroupDO::getGid, gid)
-                //TODO 通过Gateway 获取用户名
-                .eq(GroupDO::getUsername,UserContext.getUsername());
+                .eq(GroupDO::getUsername, Optional.ofNullable(username).orElse(UserContext.getUsername()));
         GroupDO groupDO = baseMapper.selectOne(queryWrapper);
         return groupDO != null;
     }
