@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 
 /**
@@ -66,24 +67,17 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 .eq(GroupDO::getUsername,UserContext.getUsername())
                 .orderByDesc(GroupDO::getSortOrder,GroupDO::getUpdateTime);
         List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
-        // TODO 通过已经完成的接口,为每一个GroupRespDTO 的shortLinkCount属性赋值
-        // 先拿到所有的gid,构建为gid 的list,作为下面service方法的请求参数
-        List<String> gids = groupDOList.stream().map(GroupDO::getGid).toList();
-        // 拿到了每个gid 及其对应的数量,需要取出来
-        List<ShortLinkGroupCountQueryRespDTO> groupCountList = shortLinkRemoteService.listGroupShortLinkCount(gids);
-        // 为CountList构建一个HashMap,方便使用
-        Map<String,Integer> groupCountMap = new HashMap<>();
-        for(ShortLinkGroupCountQueryRespDTO item:groupCountList){
-            String gid = item.getGid();
-            Integer count = item.getShortLinkCount();
-            groupCountMap.put(gid,count);
-        }
-        //HashMap 构建完毕
         List<ShortLinkGroupRespDTO> resultList = BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
-        resultList.forEach(each -> {
-            each.setShortLinkCount(groupCountMap.get(each.getGid()));
-        });
-        //赋值完毕
+
+        Map<String, Integer> groupCountMap = shortLinkRemoteService.listGroupShortLinkCount(
+                        groupDOList.stream().map(GroupDO::getGid).toList()
+                ).stream()
+                .collect(Collectors.toMap(
+                        ShortLinkGroupCountQueryRespDTO::getGid,
+                        ShortLinkGroupCountQueryRespDTO::getShortLinkCount
+                ));
+
+        resultList.forEach(each -> each.setShortLinkCount(groupCountMap.get(each.getGid())));
         return resultList;
     }
 
