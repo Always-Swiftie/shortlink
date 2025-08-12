@@ -24,7 +24,7 @@ public class GroupController {
     private final GroupService groupService;
 
     /**
-     * 新增短链接
+     * 新增短链接分组
      * @param requestParam 新增短链接请求参数
      */
     @PostMapping("/api/shortlink/v1/admin/group")
@@ -34,7 +34,7 @@ public class GroupController {
     }
 
     /**
-     * 查询短链接列表
+     * 查询短链接分组列表
      *
      */
     @GetMapping("/api/shortlink/v1/admin/group")
