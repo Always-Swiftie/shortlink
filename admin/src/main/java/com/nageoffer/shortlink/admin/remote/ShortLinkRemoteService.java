@@ -1,16 +1,21 @@
 package com.nageoffer.shortlink.admin.remote;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.http.HttpUtil;
+import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
+import com.alibaba.fastjson2.util.BeanUtils;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nageoffer.shortlink.admin.common.convention.result.Result;
+import com.nageoffer.shortlink.admin.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -43,6 +48,17 @@ public interface ShortLinkRemoteService {
         Result<IPage<ShortLinkPageRespDTO>> resultObj =
                 JSON.parseObject(resultPageStr, new TypeReference<Result<IPage<ShortLinkPageRespDTO>>>() {});
         return resultObj.getData();
+    }
+
+    /**
+     * 查询分组短链接数量统计
+     * @param requestParam 请求参数 -gids
+     */
+    default List<ShortLinkGroupCountQueryRespDTO> listGroupShortLinkCount(List<String> requestParam){
+        Map<String,Object> requestMap = new HashMap<>();
+        requestMap.put("requestParam",requestParam);
+        String resultJsonStr = HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/count/remote", requestMap);
+        return JSON.parseArray(resultJsonStr, ShortLinkGroupCountQueryRespDTO.class);
     }
 
 

@@ -10,6 +10,7 @@ import com.nageoffer.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.nageoffer.shortlink.project.service.ShortLinkService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -51,6 +52,15 @@ public class ShortLinkController {
     @GetMapping("/api/shortlink/v1/count")
     public Result<List<ShortLinkGroupCountQueryRespDTO>> listGroupShortLinkCount(@RequestParam("requestParam") List<String> requestParam){
         return Results.success(shortLinkService.listGroupShortLinkCount(requestParam));
+    }
+
+    /**
+     * 后管系统调用-查询短链接分组下数量
+     */
+    @GetMapping("/api/shortlink/v1/count/remote")
+    public List<ShortLinkGroupCountQueryRespDTO> listGroupShortLinkCountRemote(@RequestParam("requestParam") List<String> requestParam){
+        System.out.println(requestParam);
+        return shortLinkService.listGroupShortLinkCount(requestParam);
     }
 
 }

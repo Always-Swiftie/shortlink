@@ -10,13 +10,18 @@ import com.nageoffer.shortlink.admin.dao.entity.GroupDO;
 import com.nageoffer.shortlink.admin.dao.mapper.GroupMapper;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupSortReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupUpdateReqDTO;
+import com.nageoffer.shortlink.admin.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
+import com.nageoffer.shortlink.admin.remote.ShortLinkRemoteService;
 import com.nageoffer.shortlink.admin.service.GroupService;
 import com.nageoffer.shortlink.admin.util.CodeGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 
 /**
  * 短链接分组接口实现层
@@ -25,6 +30,9 @@ import java.util.List;
 @Service
 @Slf4j
 public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implements GroupService {
+
+    ShortLinkRemoteService shortLinkRemoteService = new ShortLinkRemoteService() {
+    };
 
     @Override
     public void save(String groupName) {
@@ -53,13 +61,30 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
     @Override
     public List<ShortLinkGroupRespDTO> listGroup() {
-        //TODO 获取当前用户名
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.<GroupDO>lambdaQuery()
                 .eq(BaseDO::getDelFlag,0)
                 .eq(GroupDO::getUsername,UserContext.getUsername())
                 .orderByDesc(GroupDO::getSortOrder,GroupDO::getUpdateTime);
         List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
-        return BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
+        // TODO 通过已经完成的接口,为每一个GroupRespDTO 的shortLinkCount属性赋值
+        // 先拿到所有的gid,构建为gid 的list,作为下面service方法的请求参数
+        List<String> gids = groupDOList.stream().map(GroupDO::getGid).toList();
+        // 拿到了每个gid 及其对应的数量,需要取出来
+        List<ShortLinkGroupCountQueryRespDTO> groupCountList = shortLinkRemoteService.listGroupShortLinkCount(gids);
+        // 为CountList构建一个HashMap,方便使用
+        Map<String,Integer> groupCountMap = new HashMap<>();
+        for(ShortLinkGroupCountQueryRespDTO item:groupCountList){
+            String gid = item.getGid();
+            Integer count = item.getShortLinkCount();
+            groupCountMap.put(gid,count);
+        }
+        //HashMap 构建完毕
+        List<ShortLinkGroupRespDTO> resultList = BeanUtil.copyToList(groupDOList, ShortLinkGroupRespDTO.class);
+        resultList.forEach(each -> {
+            each.setShortLinkCount(groupCountMap.get(each.getGid()));
+        });
+        //赋值完毕
+        return resultList;
     }
 
     @Override
