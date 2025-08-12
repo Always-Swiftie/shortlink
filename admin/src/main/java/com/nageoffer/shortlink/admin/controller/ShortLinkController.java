@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ShortLinkController {
 
+    //TODO 后续需要重构为Spring Cloud 调用
     /**
      * 创建短链接
      * @param requestParam 短链接创建参数

@@ -46,7 +46,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.<GroupDO>lambdaQuery()
                 .eq(GroupDO::getGid, gid)
                 //TODO 通过Gateway 获取用户名
-                .eq(GroupDO::getUsername,null);
+                .eq(GroupDO::getUsername,UserContext.getUsername());
         GroupDO groupDO = baseMapper.selectOne(queryWrapper);
         return groupDO != null;
     }
