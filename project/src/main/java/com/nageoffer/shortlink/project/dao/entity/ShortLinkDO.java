@@ -1,5 +1,6 @@
 package com.nageoffer.shortlink.project.dao.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.nageoffer.shortlink.project.common.database.BaseDO;
 import lombok.Data;
@@ -21,6 +22,7 @@ public class ShortLinkDO extends BaseDO {
     /**
      * 域名
      */
+    @TableField("domain")
     private String domain;
 
     /**

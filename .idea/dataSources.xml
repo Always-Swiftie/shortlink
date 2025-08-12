@@ -29,5 +29,15 @@
       </jdbc-additional-properties>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
+    <data-source source="LOCAL" name="mysql" uuid="897d66f6-d008-405c-9475-59bd65ba5734">
+      <imported>true</imported>
+      <configured-by-url>true</configured-by-url>
+      <jdbc-driver>org.apache.shardingsphere.driver.ShardingSphereDriver</jdbc-driver>
+      <jdbc-url>jdbc:shardingsphere:classpath:shardingsphere-config.yaml</jdbc-url>
+      <jdbc-additional-properties>
+        <property name="com.intellij.clouds.kubernetes.db.enabled" value="false" />
+      </jdbc-additional-properties>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>
