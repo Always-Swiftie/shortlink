@@ -17,8 +17,6 @@ import com.nageoffer.shortlink.admin.service.GroupService;
 import com.nageoffer.shortlink.admin.util.CodeGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -100,7 +98,6 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
     @Override
     public void deleteGroup(String gid) {
-        String username = UserContext.getUsername();
         LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.<GroupDO>lambdaQuery()
                 .eq(GroupDO::getGid, gid)
                 .eq(GroupDO::getUsername,UserContext.getUsername())
@@ -112,7 +109,6 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
 
     @Override
     public void sortGroup(List<ShortLinkGroupSortReqDTO> requestParam) {
-        String username = UserContext.getUsername();
         requestParam.forEach(dto -> {
             GroupDO groupDO = GroupDO.builder()
                     .gid(dto.getGid())
