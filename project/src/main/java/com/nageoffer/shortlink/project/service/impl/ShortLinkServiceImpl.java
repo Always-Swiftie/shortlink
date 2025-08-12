@@ -3,15 +3,20 @@ package com.nageoffer.shortlink.project.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.ObjectUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nageoffer.shortlink.project.common.convention.exception.ClientException;
 import com.nageoffer.shortlink.project.common.convention.exception.ServiceException;
+import com.nageoffer.shortlink.project.common.enums.ValiDateTypeEnum;
 import com.nageoffer.shortlink.project.config.RBloomFilterConfiguration;
 import com.nageoffer.shortlink.project.dao.entity.ShortLinkDO;
 import com.nageoffer.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkPageReqDTO;
+import com.nageoffer.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkPageRespDTO;
@@ -22,8 +27,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -99,5 +106,54 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
     @Override
     public List<ShortLinkGroupCountQueryRespDTO> listGroupShortLinkCount(List<String> requestParam) {
         return shortLinkMapper.groupShortLinkCount(requestParam);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void updateShortLink(ShortLinkUpdateReqDTO requestParam) {
+        LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                .eq(ShortLinkDO::getGid,requestParam.getGid())
+                .eq(ShortLinkDO::getFullShortUrl,requestParam.getFullShortUrl())
+                .eq(ShortLinkDO::getDelFlag,0)
+                .eq(ShortLinkDO::getEnableStatus,0);
+        ShortLinkDO hasShortLinkDO = baseMapper.selectOne(queryWrapper);
+        if(ObjectUtils.isNotNull(hasShortLinkDO)){
+            ShortLinkDO shortLinkDO = ShortLinkDO.builder()
+                    .domain(hasShortLinkDO.getDomain())
+                    .shortUri(hasShortLinkDO.getShortUri())
+                    .clickNum(hasShortLinkDO.getClickNum())
+                    .favicon(hasShortLinkDO.getFavicon())
+                    .createdType(hasShortLinkDO.getCreatedType())
+                    .gid(requestParam.getGid())
+                    .originUrl(requestParam.getOriginUrl())
+                    .description(requestParam.getDescription())
+                    .validDate(requestParam.getValidDate())
+                    .validDateType(requestParam.getValidDateType())
+                    .build();
+            if(Objects.equals(hasShortLinkDO.getGid(),requestParam.getGid())){
+                //如果修改后分组 gid 不变
+                LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
+                        .eq(ShortLinkDO::getGid,requestParam.getGid())
+                        .eq(ShortLinkDO::getFullShortUrl,requestParam.getFullShortUrl())
+                        .eq(ShortLinkDO::getEnableStatus,0)
+                        .eq(ShortLinkDO::getDelFlag,0)
+                        .set(Objects.equals(requestParam.getValidDateType(), ValiDateTypeEnum.PERMANENT.getType()),ShortLinkDO::getValidDate,null);
+                baseMapper.update(hasShortLinkDO,updateWrapper);
+            }else{
+                //gid变了,先删再插入
+                LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
+                        .eq(ShortLinkDO::getGid,hasShortLinkDO.getGid())
+                        .eq(ShortLinkDO::getFullShortUrl,requestParam.getFullShortUrl())
+                        .eq(ShortLinkDO::getEnableStatus,0)
+                        .eq(ShortLinkDO::getDelFlag,0);
+                //先删原来的
+                baseMapper.delete(updateWrapper);
+                //再插入新的
+                baseMapper.insert(shortLinkDO);
+            }
+        }else{
+            throw new ClientException("短链接记录不存在!");
+        }
+
     }
 }

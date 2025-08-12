@@ -1,6 +1,7 @@
 package com.nageoffer.shortlink.admin.remote;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpUtil;
 import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson2.JSON;
@@ -11,6 +12,7 @@ import com.nageoffer.shortlink.admin.common.convention.result.Result;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
+import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkUpdateReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
 
@@ -51,7 +53,7 @@ public interface ShortLinkRemoteService {
     }
 
     /**
-     * 查询分组短链接数量统计
+     * 查询分组短链接数量统计 - 后管系统
      * @param requestParam 请求参数 -gids
      */
     default List<ShortLinkGroupCountQueryRespDTO> listGroupShortLinkCount(List<String> requestParam){
@@ -61,5 +63,11 @@ public interface ShortLinkRemoteService {
         return JSON.parseArray(resultJsonStr, ShortLinkGroupCountQueryRespDTO.class);
     }
 
-
+    /**
+     * 修改短链接 - 后管系统
+     * @param requestParam 短链接修改参数
+     */
+    default void updateShortLink(ShortLinkUpdateReqDTO requestParam){
+        String resultJsonStr = HttpUtil.post("http://127.0.0.1:8001/api/shortlink/v1/update", JSON.toJSONString(requestParam));
+    }
 }
