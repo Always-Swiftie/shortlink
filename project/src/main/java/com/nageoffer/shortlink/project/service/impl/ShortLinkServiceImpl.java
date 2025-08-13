@@ -25,13 +25,18 @@ import com.nageoffer.shortlink.project.util.HashUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
+import org.redisson.api.RLock;
+import org.redisson.api.RReadWriteLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Function;
+
+import static com.nageoffer.shortlink.project.common.constance.RedisKeyConstant.LOCK_GID_UPDATE_KEY;
+
 
 /**
  * 短链接接口实现层
@@ -43,8 +48,10 @@ import java.util.function.Function;
 public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkDO> implements ShortLinkService {
 
     private final RBloomFilter<String> shortUriCreateBloomFilter;
-
     private final ShortLinkMapper shortLinkMapper;
+    private final RedissonClient redissonClient;
+
+    private final String createShortLinkDefaultDomain = "http://anthony.cn";
 
     @Override
     public ShortLinkCreateRespDTO createShortLink(ShortLinkCreateReqDTO requestParam) {
@@ -112,48 +119,73 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
     @Override
     public void updateShortLink(ShortLinkUpdateReqDTO requestParam) {
         LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
-                .eq(ShortLinkDO::getGid,requestParam.getGid())
+                .eq(ShortLinkDO::getGid,requestParam.getOriginGid())
                 .eq(ShortLinkDO::getFullShortUrl,requestParam.getFullShortUrl())
                 .eq(ShortLinkDO::getDelFlag,0)
                 .eq(ShortLinkDO::getEnableStatus,0);
         ShortLinkDO hasShortLinkDO = baseMapper.selectOne(queryWrapper);
-        if(ObjectUtils.isNotNull(hasShortLinkDO)){
-            ShortLinkDO shortLinkDO = ShortLinkDO.builder()
-                    .domain(hasShortLinkDO.getDomain())
-                    .shortUri(hasShortLinkDO.getShortUri())
-                    .clickNum(hasShortLinkDO.getClickNum())
-                    .favicon(hasShortLinkDO.getFavicon())
-                    .createdType(hasShortLinkDO.getCreatedType())
-                    .gid(requestParam.getGid())
-                    .originUrl(requestParam.getOriginUrl())
-                    .description(requestParam.getDescription())
-                    .validDate(requestParam.getValidDate())
-                    .validDateType(requestParam.getValidDateType())
-                    .build();
-            if(Objects.equals(hasShortLinkDO.getGid(),requestParam.getGid())){
-                //如果修改后分组 gid 不变
-                LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
+        if(ObjectUtils.isNull(hasShortLinkDO)){
+            throw new ClientException("短链接记录不存在!");
+        }
+        if(Objects.equals(hasShortLinkDO.getGid(),requestParam.getGid())){
+            //如果修改后分组 gid 不变,不涉及到分片变更,可以简单处理,直接更新即可
+            LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
                         .eq(ShortLinkDO::getGid,requestParam.getGid())
                         .eq(ShortLinkDO::getFullShortUrl,requestParam.getFullShortUrl())
                         .eq(ShortLinkDO::getEnableStatus,0)
                         .eq(ShortLinkDO::getDelFlag,0)
                         .set(Objects.equals(requestParam.getValidDateType(), ValiDateTypeEnum.PERMANENT.getType()),ShortLinkDO::getValidDate,null);
+            ShortLinkDO shortLinkDO = ShortLinkDO.builder()
+                        .domain(hasShortLinkDO.getDomain())
+                        .shortUri(hasShortLinkDO.getShortUri())
+                        .clickNum(hasShortLinkDO.getClickNum())
+                        .favicon(hasShortLinkDO.getFavicon())
+                        .createdType(hasShortLinkDO.getCreatedType())
+                        .gid(requestParam.getGid())
+                        .originUrl(requestParam.getOriginUrl())
+                        .description(requestParam.getDescription())
+                        .validDate(requestParam.getValidDate())
+                        .validDateType(requestParam.getValidDateType())
+                        .build();
                 baseMapper.update(shortLinkDO,updateWrapper);
             }else{
-                //gid变了,先删再插入
-                LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
+                //gid变了,涉及到分片切换,需要为mysql加上读写锁,写的过程中阻塞别的线程获取读锁和写锁
+            RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY,requestParam.getFullShortUrl()));
+            RLock rLock = readWriteLock.writeLock();
+            rLock.lock();
+            try {
+                LambdaUpdateWrapper<ShortLinkDO> linkUpdateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
                         .eq(ShortLinkDO::getGid,hasShortLinkDO.getGid())
                         .eq(ShortLinkDO::getFullShortUrl,requestParam.getFullShortUrl())
                         .eq(ShortLinkDO::getEnableStatus,0)
-                        .eq(ShortLinkDO::getDelFlag,0);
-                //先删原来的
-                baseMapper.delete(updateWrapper);
+                        .eq(ShortLinkDO::getDelFlag,0)
+                        .eq(ShortLinkDO::getDelTime,0L);
+                //删除存在于原分组中的旧短链接记录(软删除)
+                ShortLinkDO delShortLinkDO = ShortLinkDO.builder()
+                        .delTime(System.currentTimeMillis())
+                        .delFlag(1)
+                        .build();
+                baseMapper.update(delShortLinkDO,linkUpdateWrapper);
+                ShortLinkDO shortLinkDO = ShortLinkDO.builder()
+                        .domain(createShortLinkDefaultDomain)
+                        .originUrl(requestParam.getOriginUrl())
+                        .gid(requestParam.getGid())
+                        .createdType(hasShortLinkDO.getCreatedType())
+                        .gid(requestParam.getGid())
+                        .validDate(requestParam.getValidDate())
+                        .validDateType(requestParam.getValidDateType())
+                        .description(requestParam.getDescription())
+                        .shortUri(hasShortLinkDO.getShortUri())
+                        .enableStatus(hasShortLinkDO.getEnableStatus())
+                        .favicon(hasShortLinkDO.getFavicon())
+                        .delTime(0L)
+                        .fullShortUrl(hasShortLinkDO.getFullShortUrl())
+                        .build();
                 //再插入新的
                 baseMapper.insert(shortLinkDO);
+            }finally {
+                rLock.unlock();
             }
-        }else{
-            throw new ClientException("短链接记录不存在!");
         }
-
     }
 }

@@ -68,6 +68,7 @@ public interface ShortLinkRemoteService {
      * @param requestParam 短链接修改参数
      */
     default void updateShortLink(ShortLinkUpdateReqDTO requestParam){
+        System.out.println(requestParam.getOriginGid());
         String resultJsonStr = HttpUtil.post("http://127.0.0.1:8001/api/shortlink/v1/update", JSON.toJSONString(requestParam));
     }
 }

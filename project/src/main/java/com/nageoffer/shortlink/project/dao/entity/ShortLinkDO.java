@@ -85,4 +85,14 @@ public class ShortLinkDO extends BaseDO {
      */
     private String description;
 
+    /**
+     * 删除时间
+     */
+    private Long delTime;
+
+    /**
+     * 删除状态
+     */
+    private int delFlag;
+
 }
