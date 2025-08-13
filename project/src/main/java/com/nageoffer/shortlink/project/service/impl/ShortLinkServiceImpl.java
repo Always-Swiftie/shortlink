@@ -138,7 +138,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                         .eq(ShortLinkDO::getEnableStatus,0)
                         .eq(ShortLinkDO::getDelFlag,0)
                         .set(Objects.equals(requestParam.getValidDateType(), ValiDateTypeEnum.PERMANENT.getType()),ShortLinkDO::getValidDate,null);
-                baseMapper.update(hasShortLinkDO,updateWrapper);
+                baseMapper.update(shortLinkDO,updateWrapper);
             }else{
                 //gid变了,先删再插入
                 LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
