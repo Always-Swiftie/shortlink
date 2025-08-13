@@ -39,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import static com.nageoffer.shortlink.project.common.constance.RedisKeyConstant.*;
 
@@ -69,6 +70,20 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
             response.sendRedirect(originalUrl);
             return;
         }
+        /*
+        每个短链接url对应一个 独立的分布式锁。
+        当多个请求同时访问一个未缓存的短链接时，只有获取到锁的线程可以去访问数据库，其余线程必须等待拿到锁的线程执行完SQL
+        拿到RLock的线程执行完SQL之后，如果结果不为null,就会把缓存数据写入redis中。别的线程之后拿到锁后,需要再次尝试从缓存中获取url
+        ##获取锁后再查一次缓存，是为了 处理高并发场景下缓存刚被其他线程写入的情况。
+        */
+        boolean contains = shortUriCreateBloomFilter.contains(fullShortUrl);
+        if(!contains){
+            return;
+        }
+        String gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
+        if(StrUtil.isNotBlank(gotoIsNullShortLink)){
+            return;
+        }
         RLock lock = redissonClient.getLock(String.format(LOCK_GOTO_SHORT_LINK_KEY, fullShortUrl));
         lock.lock();
         try {
@@ -81,6 +96,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                         .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
             ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(linkGotoQueryWrapper);
             if(shortLinkGotoDO == null){
+                //case : 布隆过滤器失效,该短链接没有获得映射,为了防止缓存穿透,缓存空值
+                stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl), "-");
+                stringRedisTemplate.expire(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),1, TimeUnit.MINUTES);
                 return;
             }
             LambdaQueryWrapper<ShortLinkDO> linkQueryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
