@@ -93,6 +93,6 @@ public class ShortLinkDO extends BaseDO {
     /**
      * 删除状态
      */
-    private int delFlag;
+    private Integer delFlag;
 
 }

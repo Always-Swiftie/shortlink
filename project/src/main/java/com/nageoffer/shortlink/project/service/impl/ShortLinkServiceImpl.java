@@ -61,6 +61,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
 
         shortLinkDO.setFullShortUrl(fullShortUrl);
         shortLinkDO.setShortUri(shortLinkSuffix);
+        shortLinkDO.setDelFlag(0);
+        shortLinkDO.setDelTime(0L);
         shortLinkDO.setEnableStatus(0);
 
         try{
@@ -178,8 +180,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                         .shortUri(hasShortLinkDO.getShortUri())
                         .enableStatus(hasShortLinkDO.getEnableStatus())
                         .favicon(hasShortLinkDO.getFavicon())
-                        .delTime(0L)
                         .fullShortUrl(hasShortLinkDO.getFullShortUrl())
+                        .delFlag(0)
+                        .delTime(0L)
                         .build();
                 //再插入新的
                 baseMapper.insert(shortLinkDO);
