@@ -9,7 +9,10 @@ import com.nageoffer.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkPageRespDTO;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -43,4 +46,12 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
      * @param requestParam 修改参数
      */
     void updateShortLink(ShortLinkUpdateReqDTO requestParam);
+
+    /**
+     * 短链接跳转
+     * @param shortUri
+     * @param request
+     * @param response
+     */
+    void restoreUrl(String shortUri, HttpServletRequest request, HttpServletResponse response) throws IOException;
 }
