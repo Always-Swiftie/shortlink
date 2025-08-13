@@ -33,14 +33,18 @@ import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.scripting.support.ResourceScriptSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -70,68 +74,86 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
     public void restoreUrl(String shortUri, HttpServletRequest request, HttpServletResponse response) throws IOException {
         String serverName = request.getServerName();
         String fullShortUrl = serverName + "/" + shortUri;
-        String originalUrl = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
-        if(StrUtil.isNotEmpty(originalUrl)){
-            response.sendRedirect(originalUrl);
-            return;
-        }
-        /*
-        每个短链接url对应一个 独立的分布式锁。
-        当多个请求同时访问一个未缓存的短链接时，只有获取到锁的线程可以去访问数据库，其余线程必须等待拿到锁的线程执行完SQL
-        拿到RLock的线程执行完SQL之后，如果结果不为null,就会把缓存数据写入redis中。别的线程之后拿到锁后,需要再次尝试从缓存中获取url
-        ##获取锁后再查一次缓存，是为了 处理高并发场景下缓存刚被其他线程写入的情况。
-        */
+
+        // 先检查布隆过滤器
         boolean contains = shortUriCreateBloomFilter.contains(fullShortUrl);
-        if(!contains){
+        if (!contains) {
             response.sendRedirect("/page/notfound");
             return;
         }
-        String gotoIsNullShortLink = stringRedisTemplate.opsForValue().get(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl));
-        if(StrUtil.isNotBlank(gotoIsNullShortLink)){
-            response.sendRedirect("/page/notfound");
-            return;
-        }
+
+        String gotoShortKey = String.format(GOTO_SHORT_LINK_KEY, fullShortUrl);
+        String gotoNullKey = String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl);
+
+        // 加锁防止缓存击穿
         RLock lock = redissonClient.getLock(String.format(LOCK_GOTO_SHORT_LINK_KEY, fullShortUrl));
         lock.lock();
         try {
-            originalUrl = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
-            if(StrUtil.isNotBlank(originalUrl)){
-                response.sendRedirect(originalUrl);
+            // 运行 Lua 脚本
+            DefaultRedisScript<List> redisScript = new DefaultRedisScript<>();
+            redisScript.setScriptSource(new ResourceScriptSource(new ClassPathResource("atomic_restore_url.lua")));
+            redisScript.setResultType(List.class);
+
+            // 初始执行（只读，不写）
+            List<Object> result = stringRedisTemplate.execute(
+                    redisScript,
+                    Arrays.asList(gotoShortKey, gotoNullKey),
+                    "-", "60" // 默认先传空值，后面如果需要会再次调用写入
+            );
+
+            if ("HIT".equals(result.get(0))) {
+                response.sendRedirect((String) result.get(1));
                 return;
-            }
-            LambdaQueryWrapper<ShortLinkGotoDO> linkGotoQueryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
-                        .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
-            ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(linkGotoQueryWrapper);
-            if(shortLinkGotoDO == null){
-                //case : 布隆过滤器失效,该短链接没有获得映射,为了防止缓存穿透,缓存空值
-                stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl), "-");
-                stringRedisTemplate.expire(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl),1, TimeUnit.MINUTES);
+            } else if ("NULL".equals(result.get(0))) {
                 response.sendRedirect("/page/notfound");
                 return;
             }
+
+            // Redis 没有，去 DB 查询
+            LambdaQueryWrapper<ShortLinkGotoDO> linkGotoQueryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
+                    .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
+            ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(linkGotoQueryWrapper);
+            if (shortLinkGotoDO == null) {
+                // DB 也没查到，缓存空值
+                stringRedisTemplate.execute(
+                        redisScript,
+                        Arrays.asList(gotoShortKey, gotoNullKey),
+                        "-", "60"
+                );
+                response.sendRedirect("/page/notfound");
+                return;
+            }
+
             LambdaQueryWrapper<ShortLinkDO> linkQueryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
-                        .eq(ShortLinkDO::getGid,shortLinkGotoDO.getGid())
-                        .eq(ShortLinkDO::getFullShortUrl,fullShortUrl)
-                        .eq(ShortLinkDO::getDelFlag,0)
-                        .eq(ShortLinkDO::getEnableStatus,0);
+                    .eq(ShortLinkDO::getGid, shortLinkGotoDO.getGid())
+                    .eq(ShortLinkDO::getFullShortUrl, fullShortUrl)
+                    .eq(ShortLinkDO::getDelFlag, 0)
+                    .eq(ShortLinkDO::getEnableStatus, 0);
             ShortLinkDO shortLinkDO = baseMapper.selectOne(linkQueryWrapper);
 
-            if(shortLinkDO != null){
-                //若短链接已经过期,缓存空值
-                if(shortLinkDO.getValidDate() != null && shortLinkDO.getValidDate().before(new Date())){
-                    stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl), "-",1, TimeUnit.MINUTES);
+            if (shortLinkDO != null) {
+                // 检查是否过期
+                if (shortLinkDO.getValidDate() != null && shortLinkDO.getValidDate().before(new Date())) {
+                    stringRedisTemplate.execute(
+                            redisScript,
+                            Arrays.asList(gotoShortKey, gotoNullKey),
+                            "-", "60"
+                    );
                     response.sendRedirect("/page/notfound");
                     return;
                 }
-                stringRedisTemplate.opsForValue().set(
-                        String.format(GOTO_SHORT_LINK_KEY,fullShortUrl),
-                        shortLinkDO.getOriginUrl());
+
+                // 写入正常 URL
+                stringRedisTemplate.execute(
+                        redisScript,
+                        Arrays.asList(gotoShortKey, gotoNullKey),
+                        shortLinkDO.getOriginUrl(), "60"
+                );
                 response.sendRedirect(shortLinkDO.getOriginUrl());
             }
-        }finally {
-                lock.unlock();
+        } finally {
+            lock.unlock();
         }
-
     }
 
     @Override
