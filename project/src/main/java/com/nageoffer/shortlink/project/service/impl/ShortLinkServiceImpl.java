@@ -27,6 +27,7 @@ import com.nageoffer.shortlink.project.util.LinkUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
@@ -38,6 +39,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -141,6 +144,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
         shortLinkDO.setShortUri(shortLinkSuffix);
         shortLinkDO.setDelFlag(0);
         shortLinkDO.setDelTime(0L);
+//        shortLinkDO.setFavicon(getFavicon(requestParam.getOriginUrl()));
         shortLinkDO.setEnableStatus(0);
 
         ShortLinkGotoDO linkGotoDO = ShortLinkGotoDO.builder()
@@ -237,6 +241,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                         .description(requestParam.getDescription())
                         .validDate(requestParam.getValidDate())
                         .validDateType(requestParam.getValidDateType())
+                        .favicon(hasShortLinkDO.getFavicon())
                         .build();
                 baseMapper.update(shortLinkDO,updateWrapper);
             }else{
@@ -270,6 +275,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                         .enableStatus(hasShortLinkDO.getEnableStatus())
                         .favicon(hasShortLinkDO.getFavicon())
                         .fullShortUrl(hasShortLinkDO.getFullShortUrl())
+                        .favicon(hasShortLinkDO.getFavicon())
                         .delFlag(0)
                         .delTime(0L)
                         .build();
@@ -279,5 +285,47 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                 rLock.unlock();
             }
         }
+    }
+
+    /**
+     * 获取网站的favicon图标链接
+     * @param url 网站的URL
+     * @return favicon图标链接，如果不存在则返回nulL
+     */
+    @SneakyThrows
+    private String getFavicon(String url) {
+        //创建URL对象
+        URL targetUrl = new URL(url);
+        //打开连接
+        HttpURLConnection connection = (HttpURLConnection) targetUrl.openConnection();
+        // 禁止自动处理重定向
+        connection.setInstanceFollowRedirects(false);
+        // 设置请求方法为GET
+        connection.setRequestMethod("GET");
+        //连接
+        connection.connect();
+        //获取响应码
+        int responseCode = connection.getResponseCode();
+        // 如果是重定向响应码
+        if (responseCode == HttpURLConnection.HTTP_MOVED_PERM || responseCode == HttpURLConnection.HTTP_MOVED_TEMP) {
+            //获取重定向的URL
+            String redirectUrl = connection.getHeaderField("Location");
+            //如果重定向URL不为空
+            if (redirectUrl != null) {
+                // 创建新的URL对象
+                URL newUrl = new URL(redirectUrl);//打开新的连接
+                connection = (HttpURLConnection) newUrl.openConnection();//设置请求方法为GET
+                connection.setRequestMethod("GET");//连接
+                connection.connect();//获取新的响应码
+                responseCode = connection.getResponseCode();
+            }
+        }
+        // 如果响应码为200(HTTP_OK)
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            return connection.getHeaderField("Favicon");
+        }else{
+            return null;
+        }
+
     }
 }
