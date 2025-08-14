@@ -8,7 +8,7 @@ import com.nageoffer.shortlink.admin.common.biz.user.UserContext;
 import com.nageoffer.shortlink.admin.common.convention.exception.ClientException;
 import com.nageoffer.shortlink.admin.dao.entity.GroupDO;
 import com.nageoffer.shortlink.admin.dao.mapper.GroupMapper;
-import com.nageoffer.shortlink.admin.dto.req.ShortLinkRecycleBinReqDTO;
+import com.nageoffer.shortlink.admin.dto.req.RecycleBinPageReqDTO;
 import com.nageoffer.shortlink.admin.remote.ShortLinkRemoteService;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
 import com.nageoffer.shortlink.admin.service.RecycleBinService;
@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.stream.Collectors;
+
 
 /**
  * 短链接回收站 -- 后管系统
@@ -29,7 +29,7 @@ public class RecycleBinServiceImpl implements RecycleBinService {
     private final GroupMapper groupMapper;
 
     @Override
-    public IPage<ShortLinkPageRespDTO> pageRecycleBin(ShortLinkRecycleBinReqDTO requestParam) {
+    public IPage<ShortLinkPageRespDTO> pageRecycleBin(RecycleBinPageReqDTO requestParam) {
         //首先需要通过用户用户上下文获取当前用户的gid List
         String username = UserContext.getUsername();
         LambdaQueryWrapper<GroupDO>  queryWrapper = Wrappers.<GroupDO>lambdaQuery()

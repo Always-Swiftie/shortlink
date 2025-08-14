@@ -5,6 +5,7 @@ import com.nageoffer.shortlink.project.common.convention.result.Result;
 import com.nageoffer.shortlink.project.common.convention.result.Results;
 import com.nageoffer.shortlink.project.dto.req.RecycleBinSaveReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkRecycleBinReqDTO;
+import com.nageoffer.shortlink.project.dto.req.RecycleBinRecoverReqDTO;
 import com.nageoffer.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.nageoffer.shortlink.project.service.RecycleBinService;
 import lombok.RequiredArgsConstructor;
@@ -37,10 +38,20 @@ public class RecycleBinController {
     /**
      * 分页查询回收站中短链接
      * @param requestParam 分页参数:gid
-     *
+     * 这个接口是从admin后管中调用的,所以在这里可以不需要RequestBody注解?
      */
     @GetMapping("/api/shortlink/v1/recyclebin/page")
     public Result<IPage<ShortLinkPageRespDTO>> pageShortLink(ShortLinkRecycleBinReqDTO requestParam){
         return Results.success(recycleBinService.pageRecycleBin(requestParam));
+    }
+
+    /**
+     * 从回收站中恢复短链接
+     * @param requestParam 请求参数
+     */
+    @PostMapping("/api/shortlink/v1/recyclebin/recover")
+    public Result<Void> recoverRecycleBin(@RequestBody RecycleBinRecoverReqDTO requestParam){
+        recycleBinService.recoverRecycleBin(requestParam);
+        return Results.success();
     }
 }

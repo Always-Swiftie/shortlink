@@ -11,7 +11,7 @@ import java.util.List;
  * @author 20784
  */
 @Data
-public class ShortLinkRecycleBinReqDTO extends Page {
+public class RecycleBinPageReqDTO extends Page {
 
     /**
      * 当前用户分组标识集合

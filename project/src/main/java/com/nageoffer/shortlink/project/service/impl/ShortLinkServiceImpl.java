@@ -132,6 +132,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                         shortLinkDO.getOriginUrl());
                 response.sendRedirect(shortLinkDO.getOriginUrl());
             }else{
+                //适用于第一次访问刚刚被移入回收站的短链接,goto查得到但是shortlinkDO查不到,需要重新添加空值缓存,这里的有效期就应该是永久的
+                stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl), "-");
                 response.sendRedirect("/page/notfound");
             }
         }finally {
