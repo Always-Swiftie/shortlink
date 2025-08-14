@@ -10,6 +10,7 @@ import com.alibaba.fastjson2.util.BeanUtils;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.nageoffer.shortlink.admin.common.convention.result.Result;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkGroupCountQueryRespDTO;
+import com.nageoffer.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkUpdateReqDTO;
@@ -73,7 +74,19 @@ public interface ShortLinkRemoteService {
         String resultJsonStr = HttpUtil.post("http://127.0.0.1:8001/api/shortlink/v1/update", JSON.toJSONString(requestParam));
     }
 
+    /**
+     * 根据原始链接获取标题
+     * @param url 原始链接
+     * @return 网站图片
+     */
     default String getTitleByUrl(String url) throws IOException{
         return HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/title/remote?url=" + url);
+    }
+
+    /** 保存短链接到回收站
+     * @param requestParam 请求参数
+     */
+    default void saveRecycleBin(RecycleBinSaveReqDTO requestParam){
+        HttpUtil.post("http://127.0.0.1:8001/api/shortlink/v1/recyclebin/save",JSON.toJSONString(requestParam));
     }
 }
