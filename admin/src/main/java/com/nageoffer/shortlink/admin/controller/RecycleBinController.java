@@ -6,14 +6,12 @@ import com.nageoffer.shortlink.admin.common.convention.result.Results;
 import com.nageoffer.shortlink.admin.dto.req.RecycleBinPageReqDTO;
 import com.nageoffer.shortlink.admin.remote.ShortLinkRemoteService;
 import com.nageoffer.shortlink.admin.remote.dto.req.RecycleBinRecoverReqDTO;
+import com.nageoffer.shortlink.admin.remote.dto.req.RecycleBinRemoveReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
 import com.nageoffer.shortlink.admin.service.RecycleBinService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * 回收站管理控制层 -- 后管系统
@@ -57,6 +55,18 @@ public class RecycleBinController {
         ShortLinkRemoteService shortLinkRemoteService = new ShortLinkRemoteService() {
         };
         shortLinkRemoteService.recoverRecycleBin(requestParam);
+        return Results.success();
+    }
+
+    /**
+     * 从回收站中删除短链接 后管
+     * @param requestParam 删除请求参数
+     */
+    @PostMapping("/api/shortlink/v1/admin/recyclebin/remove")
+    public Result<Void> removeRecycleBin(@RequestBody RecycleBinRemoveReqDTO requestParam){
+        ShortLinkRemoteService shortLinkRemoteService = new ShortLinkRemoteService() {
+        };
+        shortLinkRemoteService.removeRecycleBin(requestParam);
         return Results.success();
     }
 
