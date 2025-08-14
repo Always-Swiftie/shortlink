@@ -131,6 +131,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                         String.format(GOTO_SHORT_LINK_KEY,fullShortUrl),
                         shortLinkDO.getOriginUrl());
                 response.sendRedirect(shortLinkDO.getOriginUrl());
+            }else{
+                response.sendRedirect("/page/notfound");
             }
         }finally {
             lock.unlock();
