@@ -4,6 +4,8 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.date.Week;
+import cn.hutool.core.lang.UUID;
+import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -29,6 +31,7 @@ import com.nageoffer.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.nageoffer.shortlink.project.service.ShortLinkService;
 import com.nageoffer.shortlink.project.util.HashUtil;
 import com.nageoffer.shortlink.project.util.LinkUtil;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -43,10 +46,12 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.nageoffer.shortlink.project.common.constance.RedisKeyConstant.*;
 
@@ -75,8 +80,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
         String fullShortUrl = serverName + "/" + shortUri;
         String originalUrl = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
         if(StrUtil.isNotEmpty(originalUrl)){
-            response.sendRedirect(originalUrl);
             shortLinkStats(fullShortUrl,null,request,response);
+            response.sendRedirect(originalUrl);
             return;
         }
         /*
@@ -100,8 +105,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
         try {
             originalUrl = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
             if(StrUtil.isNotBlank(originalUrl)){
-                response.sendRedirect(originalUrl);
                 shortLinkStats(fullShortUrl,null,request,response);
+                response.sendRedirect(originalUrl);
                 return;
             }
             LambdaQueryWrapper<ShortLinkGotoDO> linkGotoQueryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
@@ -131,8 +136,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                 stringRedisTemplate.opsForValue().set(
                         String.format(GOTO_SHORT_LINK_KEY,fullShortUrl),
                         shortLinkDO.getOriginUrl());
-                response.sendRedirect(shortLinkDO.getOriginUrl());
                 shortLinkStats(shortLinkDO.getFullShortUrl(),shortLinkDO.getGid(),request,response);
+                response.sendRedirect(shortLinkDO.getOriginUrl());
             }else{
                 //适用于第一次访问刚刚被移入回收站的短链接,goto查得到但是shortlinkDO查不到,需要重新添加空值缓存,这里的有效期就应该是永久的
                 stringRedisTemplate.opsForValue().set(String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl), "-");
@@ -143,23 +148,49 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
         }
     }
 
-    private void shortLinkStats(String fullShortUrl,String gid,HttpServletRequest request, HttpServletResponse response) throws IOException {
+    @SneakyThrows
+    private void shortLinkStats(String fullShortUrl,String gid,HttpServletRequest request, HttpServletResponse response){
+        AtomicBoolean uvFirstFlag = new AtomicBoolean();
+        Cookie[] cookies = request.getCookies();
         try {
-            if(gid == null){
-             LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
-                     .eq(ShortLinkGotoDO::getFullShortUrl,fullShortUrl);
-             ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(queryWrapper);
-             if(shortLinkGotoDO == null){
-                 throw new ClientException("短链接访问统计出错");
-             }
-             gid = shortLinkGotoDO.getGid();
+            Runnable addResponseCookieTask = () -> {
+                String uv = UUID.fastUUID().toString();
+                Cookie uvCookie = new Cookie("uv", uv);
+                uvCookie.setMaxAge(60 * 60 * 24 * 30);
+                uvCookie.setPath(StrUtil.sub(fullShortUrl,fullShortUrl.indexOf("/"),fullShortUrl.length()));
+                response.addCookie(uvCookie);
+                uvFirstFlag.set(true);
+                stringRedisTemplate.opsForSet().add("shortlink:stats:uv" + fullShortUrl, uv);
+            };
+
+            if(ArrayUtil.isNotEmpty(cookies)){
+                Arrays.stream(cookies)
+                        .filter(each -> Objects.equals(each.getName(), "uv"))
+                        .findFirst()
+                        .map(Cookie::getValue)
+                        .ifPresentOrElse(each ->{
+                            Long added = stringRedisTemplate.opsForSet().add("shortlink:stats:uv" + fullShortUrl, each);
+                            uvFirstFlag.set(added != null && added > 0L);
+                        },addResponseCookieTask);
+            }else{
+                addResponseCookieTask.run();
+            }
+
+            if(StrUtil.isBlank(gid)){
+                LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
+                        .eq(ShortLinkGotoDO::getFullShortUrl,fullShortUrl);
+                ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(queryWrapper);
+                if(shortLinkGotoDO == null){
+                    throw new ClientException("短链接访问统计出错");
+                }
+                gid = shortLinkGotoDO.getGid();
             }
             int hour = DateUtil.hour(new Date(),true);
             Week week = DateUtil.dayOfWeekEnum(new Date());
             int weekValue = week.getIso8601Value();
             LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
                     .pv(1)
-                    .uv(1)
+                    .uv(uvFirstFlag.get() ? 1:0)
                     .uip(1)
                     .hour(hour)
                     .weekday(weekValue)
@@ -169,7 +200,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                     .build();
             linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
         }catch (Exception e){
-            log.error("短链接访问统计信息异常",e);
+            throw new ClientException("短链接访问数据统计异常");
         }
     }
 
@@ -284,7 +315,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                         .build();
                 baseMapper.update(shortLinkDO,updateWrapper);
             }else{
-                //gid变了,涉及到分片切换,需要为mysql加上读写锁,写的过程中阻塞别的线程获取读锁和写锁
+                //gid变了,涉及到分片切换,写的过程中阻塞别的线程获取读锁和写锁
             RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY,requestParam.getFullShortUrl()));
             RLock rLock = readWriteLock.writeLock();
             rLock.lock();
