@@ -12,6 +12,8 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -139,6 +141,23 @@ public class LinkUtil {
             ipAddress = request.getRemoteAddr();
         }
         return ipAddress;
+    }
+
+    /**
+     * 根据当前时间到下一个小时的分钟差值并返回
+     * @return
+     */
+    public static int minutesUntilNextHour() {
+        // 获取当前时间
+        LocalDateTime now = LocalDateTime.now();
+
+        // 获取下一个整点时间
+        LocalDateTime nextHour = now.plusHours(1).truncatedTo(ChronoUnit.HOURS);
+
+        // 计算当前时间到下一个整点的分钟差值
+        long minutesUntilNextHour = ChronoUnit.MINUTES.between(now, nextHour);
+
+        return (int) minutesUntilNextHour;
     }
 
 

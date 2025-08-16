@@ -177,6 +177,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
             }
             String remoteAddr = LinkUtil.getIp(request);
             Long uipAdded = stringRedisTemplate.opsForSet().add("shortlink:stats:uip" + fullShortUrl, remoteAddr);
+            stringRedisTemplate.expire("shortlink:stats:uip" + fullShortUrl, LinkUtil.minutesUntilNextHour(), TimeUnit.MINUTES);
             boolean uipFirstFlag = uipAdded != null && uipAdded > 0L;
             if(StrUtil.isBlank(gid)){
                 LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
