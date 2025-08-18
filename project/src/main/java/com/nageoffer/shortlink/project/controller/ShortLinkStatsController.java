@@ -1,0 +1,34 @@
+package com.nageoffer.shortlink.project.controller;
+
+import com.nageoffer.shortlink.project.common.convention.result.Result;
+import com.nageoffer.shortlink.project.common.convention.result.Results;
+import com.nageoffer.shortlink.project.dto.req.ShortLinkStatsReqDTO;
+import com.nageoffer.shortlink.project.dto.resp.ShortLinkStatsRespDTO;
+import com.nageoffer.shortlink.project.service.ShortLinkStatsService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 短链接监控控制层
+ * @author 20784
+ */
+@RestController
+@RequiredArgsConstructor
+public class ShortLinkStatsController {
+
+    private final ShortLinkStatsService shortLinkStatsService;
+
+    /**
+     * 获取单个短链接访问统计数据
+     * @param requestParam
+     * @return
+     */
+    @GetMapping("/api/shortlink/v1/stats")
+    public Result<ShortLinkStatsRespDTO> shortLinkStats(@RequestBody ShortLinkStatsReqDTO requestParam) {
+        return Results.success(shortLinkStatsService.oneShortLinkStats(requestParam));
+    }
+
+}

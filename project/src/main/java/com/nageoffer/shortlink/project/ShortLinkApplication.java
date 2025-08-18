@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 /**
  * @author 20784
  */
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = "com.nageoffer.*")
 @MapperScan("com.nageoffer.shortlink.project.dao.mapper")
 public class ShortLinkApplication {
 
