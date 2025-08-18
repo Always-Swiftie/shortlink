@@ -20,6 +20,7 @@ package com.nageoffer.shortlink.project.dao.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.nageoffer.shortlink.project.dao.entity.LinkStatsTodayDO;
 import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 /**
@@ -27,6 +28,7 @@ import org.apache.ibatis.annotations.Param;
  * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：link）获取项目资料
  * @author 20784
  */
+@Mapper
 public interface LinkStatsTodayMapper extends BaseMapper<LinkStatsTodayDO> {
 
     /**

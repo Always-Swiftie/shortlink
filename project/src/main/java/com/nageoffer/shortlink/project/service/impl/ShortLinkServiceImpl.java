@@ -75,6 +75,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
     private final LinkAccessLogsMapper linkAccessLogsMapper;
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
+    private final LinkStatsTodayMapper linkStatsTodayMapper;
 
     @Value("${shortlink.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
@@ -292,6 +293,16 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                     .device(device)
                     .build();
             linkAccessLogsMapper.insert(linkAccessLogsDO);
+
+            LinkStatsTodayDO linkStatsTodayDO = LinkStatsTodayDO.builder()
+                    .gid(gid)
+                    .fullShortUrl(fullShortUrl)
+                    .date(new Date())
+                    .todayPv(1)
+                    .todayUv(uvFirstFlag.get() ? 1 : 0)
+                    .todayUip(uipFirstFlag ? 1 : 0)
+                    .build();
+            linkStatsTodayMapper.shortLinkTodayState(linkStatsTodayDO);
         }catch (Exception e){
             throw new ClientException("短链接访问数据统计异常");
         }
@@ -309,6 +320,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
         shortLinkDO.setDelTime(0L);
         shortLinkDO.setFavicon(LinkUtil.getFavicon(requestParam.getOriginUrl()));
         shortLinkDO.setEnableStatus(0);
+        shortLinkDO.setTotalPv(0);
+        shortLinkDO.setTotalUv(0);
+        shortLinkDO.setTotalUip(0);
 
         ShortLinkGotoDO linkGotoDO = ShortLinkGotoDO.builder()
                 .fullShortUrl(fullShortUrl)
