@@ -87,19 +87,20 @@ public class ShortLinkStatsController {
         );
     }
 
-//    /**
-//     * 访问分组短链接指定时间内访问记录监控数据
-//     */
-//    @GetMapping("/api/shortlink/admin/v1/stats/access-record/group")
-//    public Result<Page<ShortLinkStatsAccessRecordRespDTO>> groupShortLinkStatsAccessRecord(ShortLinkGroupStatsAccessRecordReqDTO requestParam) {
-//        ShortLinkRemoteService shortLinkRemoteService = new ShortLinkRemoteService() {
-//        };
-//        return shortLinkRemoteService.groupShortLinkStatsAccessRecord(
-//                requestParam.getGid(),
-//                requestParam.getStartDate(),
-//                requestParam.getEndDate(),
-//                requestParam.getCurrent(),
-//                requestParam.getSize()
-//        );
+    /**
+     * 访问分组短链接指定时间内访问记录监控数据
+     */
+    @GetMapping("/api/shortlink/admin/v1/stats/access-record/group")
+    public Result<Page<ShortLinkStatsAccessRecordRespDTO>> groupShortLinkStatsAccessRecord(ShortLinkGroupStatsAccessRecordReqDTO requestParam) {
+        ShortLinkRemoteService shortLinkRemoteService = new ShortLinkRemoteService() {
+        };
+        return shortLinkRemoteService.groupShortLinkStatsAccessRecord(
+                requestParam.getGid(),
+                requestParam.getStartDate(),
+                requestParam.getEndDate(),
+                requestParam.getCurrent(),
+                requestParam.getSize()
+        );
     }
+}
 

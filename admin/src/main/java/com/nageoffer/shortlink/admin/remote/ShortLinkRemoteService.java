@@ -137,7 +137,12 @@ public interface ShortLinkRemoteService {
     }
 
     default Result<ShortLinkStatsRespDTO> groupShortLinkStats(String gid, String startDate, String endDate){
-        return null;
+        Map<String,Object> requestMap = new HashMap<>();
+        requestMap.put("gid",gid);
+        requestMap.put("startDate",startDate);
+        requestMap.put("endDate",endDate);
+        String resultBodyStr = HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/stats/group", requestMap);
+        return JSON.parseObject(resultBodyStr, new TypeReference<>(){});
     }
 
     /**
@@ -153,6 +158,17 @@ public interface ShortLinkRemoteService {
         requestMap.put("current",current);
         requestMap.put("size",size);
         String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/stats/access-record",requestMap);
+        return JSON.parseObject(resultPageStr, new TypeReference<>(){});
+    }
+
+    default Result<Page<ShortLinkStatsAccessRecordRespDTO>> groupShortLinkStatsAccessRecord(String gid, String startDate, String endDate, long current, long size){
+        Map<String,Object> requestMap = new HashMap<>();
+        requestMap.put("gid",gid);
+        requestMap.put("startDate",startDate);
+        requestMap.put("endDate",endDate);
+        requestMap.put("current",current);
+        requestMap.put("size",size);
+        String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/stats/access-record/group",requestMap);
         return JSON.parseObject(resultPageStr, new TypeReference<>(){});
     }
 }
