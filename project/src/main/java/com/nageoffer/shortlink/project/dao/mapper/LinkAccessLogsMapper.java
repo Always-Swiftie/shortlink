@@ -108,7 +108,7 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
     /**
      * 获取用户信息是否新老访客
      */
-    @Select("<script> " +
+    @Select(" <script> " +
             "SELECT " +
             "    tlal.user, " +
             "    CASE " +
@@ -129,7 +129,8 @@ public interface LinkAccessLogsMapper extends BaseMapper<LinkAccessLogsDO> {
             "    </foreach> " +
             "GROUP BY " +
             "    tlal.user;" +
-            "</script>")
+            " </script> "
+    )
     List<Map<String, Object>> selectUvTypeByUsers(
             @Param("gid") String gid,
             @Param("fullShortUrl") String fullShortUrl,

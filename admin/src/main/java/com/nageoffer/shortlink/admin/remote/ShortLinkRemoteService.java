@@ -1,15 +1,20 @@
 package com.nageoffer.shortlink.admin.remote;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.http.HttpUtil;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.nageoffer.shortlink.admin.common.convention.result.Result;
 import com.nageoffer.shortlink.admin.dto.req.RecycleBinPageReqDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.*;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
+import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkStatsAccessRecordRespDTO;
+import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkStatsRespDTO;
+import org.springframework.context.annotation.Bean;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -114,5 +119,39 @@ public interface ShortLinkRemoteService {
      */
     default void removeRecycleBin(RecycleBinRemoveReqDTO requestParam){
         HttpUtil.post("http://127.0.0.1:8001/api/shortlink/v1/recyclebin/remove",JSON.toJSONString(requestParam));
+    }
+
+    /**
+     * 获取单个短链接访问统计数据
+     */
+    default Result<ShortLinkStatsRespDTO> oneShortLinkStats(String fullShortUrl, String gid, Integer enableStatus, String startDate, String endDate){
+        Map<String,Object> requestMap = new HashMap<>();
+        requestMap.put("fullShortUrl",fullShortUrl);
+        requestMap.put("gid",gid);
+        requestMap.put("enableStatus",enableStatus);
+        requestMap.put("startDate",startDate);
+        requestMap.put("endDate",endDate);
+        String resultBodyStr = HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/stats", requestMap);
+        return JSON.parseObject(resultBodyStr, new TypeReference<>(){});
+    }
+
+    default Result<ShortLinkStatsRespDTO> groupShortLinkStats(String gid, String startDate, String endDate){
+        return null;
+    }
+
+    /**
+     * 访问单个短链接指定时间内访问记录监控数据 后管
+     */
+    default Result<Page<ShortLinkStatsAccessRecordRespDTO>> shortLinkStatsAccessRecord(String fullShortUrl, String gid, String startDate, String endDate, Integer enableStatus, long current, long size){
+        Map<String,Object> requestMap = new HashMap<>();
+        requestMap.put("fullShortUrl",fullShortUrl);
+        requestMap.put("gid",gid);
+        requestMap.put("enableStatus",enableStatus);
+        requestMap.put("startDate",startDate);
+        requestMap.put("endDate",endDate);
+        requestMap.put("current",current);
+        requestMap.put("size",size);
+        String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/stats/access-record",requestMap);
+        return JSON.parseObject(resultPageStr, new TypeReference<>(){});
     }
 }
