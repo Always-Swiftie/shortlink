@@ -366,7 +366,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
             String originUrl = requestParam.getOriginUrl();
             originUrl += System.currentTimeMillis();
             shortUri = HashUtil.hashToBase62(originUrl);
-            if(!shortUriCreateBloomFilter.contains(requestParam.getDomain() + "/" + shortUri)){
+            if(!shortUriCreateBloomFilter.contains(createShortLinkDefaultDomain + ":8001" + "/" + shortUri)){
                 break;
             }
             customGenerateCount++;
