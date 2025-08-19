@@ -1,10 +1,12 @@
 package com.nageoffer.shortlink.admin.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nageoffer.shortlink.admin.common.biz.user.UserContext;
+import com.nageoffer.shortlink.admin.common.convention.exception.ClientException;
 import com.nageoffer.shortlink.admin.common.database.BaseDO;
 import com.nageoffer.shortlink.admin.dao.entity.GroupDO;
 import com.nageoffer.shortlink.admin.dao.mapper.GroupMapper;
@@ -15,12 +17,17 @@ import com.nageoffer.shortlink.admin.dto.resp.ShortLinkGroupRespDTO;
 import com.nageoffer.shortlink.admin.remote.ShortLinkRemoteService;
 import com.nageoffer.shortlink.admin.service.GroupService;
 import com.nageoffer.shortlink.admin.util.CodeGenerator;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import static com.nageoffer.shortlink.admin.common.constant.RedisCacheConstant.LOCK_GROUP_CREATE_KEY;
 
 
 /**
@@ -29,25 +36,42 @@ import java.util.stream.Collectors;
  */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implements GroupService {
+
+    private final RedissonClient redissonClient;
+    private final int GROUP_MAX_NUM = 20;
 
     ShortLinkRemoteService shortLinkRemoteService = new ShortLinkRemoteService() {
     };
 
     @Override
     public void save(String username, String groupName) {
-        String gid;
-        do {
-            gid = CodeGenerator.generateRandomCode();
-        } while (hasGid(username,gid));
+        RLock lock = redissonClient.getLock(LOCK_GROUP_CREATE_KEY + username);
+        lock.lock();
+        try {
+            LambdaQueryWrapper<GroupDO> queryWrapper = Wrappers.<GroupDO>lambdaQuery()
+                    .eq(GroupDO::getUsername, username)
+                    .eq(GroupDO::getDelFlag, 0);
+            List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
+            if(CollUtil.isNotEmpty(groupDOList) && groupDOList.size() >= GROUP_MAX_NUM){
+                throw new ClientException(String.format("最多可创建%d个分组!", GROUP_MAX_NUM));
+            }
+            String gid;
+            do {
+                gid = CodeGenerator.generateRandomCode();
+            } while (hasGid(username,gid));
 
-        GroupDO groupDO = GroupDO.builder()
-                .name(groupName)
-                .gid(gid)
-                .sortOrder(0)
-                .username(username)
-                .build();
-        baseMapper.insert(groupDO);
+            GroupDO groupDO = GroupDO.builder()
+                    .name(groupName)
+                    .gid(gid)
+                    .sortOrder(0)
+                    .username(username)
+                    .build();
+            baseMapper.insert(groupDO);
+        }finally {
+            lock.unlock();
+        }
     }
 
     @Override
