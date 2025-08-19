@@ -20,14 +20,18 @@ import com.nageoffer.shortlink.project.common.convention.exception.ServiceExcept
 import com.nageoffer.shortlink.project.common.enums.ValiDateTypeEnum;
 import com.nageoffer.shortlink.project.dao.entity.*;
 import com.nageoffer.shortlink.project.dao.mapper.*;
+import com.nageoffer.shortlink.project.dto.biz.ShortLinkStatsRecordDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkBatchCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.nageoffer.shortlink.project.dto.resp.*;
+import com.nageoffer.shortlink.project.mq.producer.ShortLinkStatsSaveProducer;
 import com.nageoffer.shortlink.project.service.ShortLinkService;
 import com.nageoffer.shortlink.project.util.HashUtil;
 import com.nageoffer.shortlink.project.util.LinkUtil;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -75,6 +79,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final LinkStatsTodayMapper linkStatsTodayMapper;
+    private final ShortLinkStatsSaveProducer shortLinkStatsSaveProducer;
 
     @Value("${shortlink.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
@@ -88,7 +93,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
         String fullShortUrl = serverName + ":8001" + "/" + shortUri;
         String originalUrl = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
         if(StrUtil.isNotEmpty(originalUrl)){
-            shortLinkStats(fullShortUrl,null,request,response);
+            shortLinkStats(fullShortUrl,null,buildLinkStatsRecordAndSetUser(fullShortUrl, request, response));
             response.sendRedirect(originalUrl);
             return;
         }
@@ -113,7 +118,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
         try {
             originalUrl = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
             if(StrUtil.isNotBlank(originalUrl)){
-                shortLinkStats(fullShortUrl,null,request,response);
+                shortLinkStats(fullShortUrl,null,buildLinkStatsRecordAndSetUser(fullShortUrl, request, response));
                 response.sendRedirect(originalUrl);
                 return;
             }
@@ -144,7 +149,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                 stringRedisTemplate.opsForValue().set(
                         String.format(GOTO_SHORT_LINK_KEY,fullShortUrl),
                         shortLinkDO.getOriginUrl());
-                shortLinkStats(shortLinkDO.getFullShortUrl(),shortLinkDO.getGid(),request,response);
+                shortLinkStats(shortLinkDO.getFullShortUrl(),shortLinkDO.getGid(),buildLinkStatsRecordAndSetUser(fullShortUrl, request, response));
                 response.sendRedirect(shortLinkDO.getOriginUrl());
             }else{
                 //适用于第一次访问刚刚被移入回收站的短链接,goto查得到但是shortlinkDO查不到,需要重新添加空值缓存,这里的有效期就应该是永久的
@@ -156,156 +161,60 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
         }
     }
 
-    @SneakyThrows
-    private void shortLinkStats(String fullShortUrl,String gid,HttpServletRequest request, HttpServletResponse response){
+    private ShortLinkStatsRecordDTO buildLinkStatsRecordAndSetUser(String fullShortUrl, ServletRequest request, ServletResponse response) {
         AtomicBoolean uvFirstFlag = new AtomicBoolean();
-        Cookie[] cookies = request.getCookies();
-        try {
-            AtomicReference<String> uv = new AtomicReference<>();
-            Runnable addResponseCookieTask = () -> {
-                uv.set(UUID.fastUUID().toString());
-                Cookie uvCookie = new Cookie("uv", uv.get());
-                uvCookie.setMaxAge(60 * 60 * 24 * 30);
-                uvCookie.setPath(StrUtil.sub(fullShortUrl,fullShortUrl.indexOf("/"),fullShortUrl.length()));
-                response.addCookie(uvCookie);
-                uvFirstFlag.set(true);
-                stringRedisTemplate.opsForSet().add("shortlink:stats:uv" + fullShortUrl, uv.get());
-            };
-
-            if(ArrayUtil.isNotEmpty(cookies)){
-                Arrays.stream(cookies)
-                        .filter(each -> Objects.equals(each.getName(), "uv"))
-                        .findFirst()
-                        .map(Cookie::getValue)
-                        .ifPresentOrElse(each ->{
-                            uv.set(each);
-                            Long uvAdded = stringRedisTemplate.opsForSet().add("shortlink:stats:uv" + fullShortUrl, each);
-                            uvFirstFlag.set(uvAdded != null && uvAdded > 0L);
-                        },addResponseCookieTask);
-            }else{
-                addResponseCookieTask.run();
-            }
-            String remoteAddr = LinkUtil.getIp(request);
-            Long uipAdded = stringRedisTemplate.opsForSet().add("shortlink:stats:uip" + fullShortUrl, remoteAddr);
-            stringRedisTemplate.expire("shortlink:stats:uip" + fullShortUrl, LinkUtil.minutesUntilNextHour(), TimeUnit.MINUTES);
-            boolean uipFirstFlag = uipAdded != null && uipAdded > 0L;
-            if(StrUtil.isBlank(gid)){
-                LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
-                        .eq(ShortLinkGotoDO::getFullShortUrl,fullShortUrl);
-                ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(queryWrapper);
-                if(shortLinkGotoDO == null){
-                    throw new ClientException("短链接访问统计出错");
-                }
-                gid = shortLinkGotoDO.getGid();
-            }
-            int hour = DateUtil.hour(new Date(),true);
-            Week week = DateUtil.dayOfWeekEnum(new Date());
-            int weekValue = week.getIso8601Value();
-            LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
-                    .pv(1)
-                    .uv(uvFirstFlag.get() ? 1:0)
-                    .uip(uipFirstFlag ? 1:0)
-                    .hour(hour)
-                    .weekday(weekValue)
-                    .fullShortUrl(fullShortUrl)
-                    .gid(gid)
-                    .date(new Date())
-                    .build();
-            linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
-            Map<String,Object> localeParamMap = new HashMap<>();
-            localeParamMap.put("key",statsLocaleAmapKey);
-            localeParamMap.put("ip",remoteAddr);
-            String localeResultStr = HttpUtil.get(AMAP_REMOTE_URL,localeParamMap);
-            JSONObject localeResultObj = JSON.parseObject(localeResultStr);
-            String infoCode = localeResultObj.getString("infocode");
-            LinkLocaleStatsDO linkLocaleStatsDO;
-            String province = localeResultObj.getString("province");
-            String city = "";
-            String adcode = "";
-            String country = "";
-            if(StrUtil.isNotBlank(infoCode) && StrUtil.equals(infoCode,"10000")){
-                boolean unknownFlag = StrUtil.equals(province,"[]");
-                country = "中国";
-                province = unknownFlag ? "未知": province;
-                city = unknownFlag ? "未知": localeResultObj.getString("city");
-                adcode = unknownFlag ? "未知": localeResultObj.getString("adcode");
-                linkLocaleStatsDO = LinkLocaleStatsDO.builder()
-                        .date(new Date())
-                        .fullShortUrl(fullShortUrl)
-                        .gid(gid)
-                        .country(country)
-                        .province(unknownFlag ? "未知" : province)
-                        .city(unknownFlag ? "未知" : city)
-                        .adcode(unknownFlag ? "未知" : adcode)
-                        .cnt(1)
-                        .build();
-                linkLocaleStatsMapper.shortLinkLocaleState(linkLocaleStatsDO);
-            }
-
-            String os = LinkUtil.getOs(request);
-            LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
-                    .gid(gid)
-                    .fullShortUrl(fullShortUrl)
-                    .os(os)
-                    .cnt(1)
-                    .date(new Date())
-                    .build();
-            linkOsStatsMapper.shortLinkOsState(linkOsStatsDO);
-
-            String browser =  LinkUtil.getBrowser(request);
-            LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
-                    .browser(browser)
-                    .cnt(1)
-                    .gid(gid)
-                    .fullShortUrl(fullShortUrl)
-                    .date(new Date())
-                    .build();
-            linkBrowserStatsMapper.shortLinkBrowserState(linkBrowserStatsDO);
-
-            String device = LinkUtil.getDevice(request);
-            LinkDeviceStatsDO linkDeviceStatsDO = LinkDeviceStatsDO.builder()
-                    .gid(gid)
-                    .fullShortUrl(fullShortUrl)
-                    .device(device)
-                    .date(new Date())
-                    .cnt(1)
-                    .build();
-            linkDeviceStatsMapper.shortLinkDeviceState(linkDeviceStatsDO);
-
-            LinkNetworkStatsDO linkNetworkStatsDO = LinkNetworkStatsDO.builder()
-                    .network(LinkUtil.getNetwork(request))
-                    .fullShortUrl(fullShortUrl)
-                    .date(new Date())
-                    .cnt(1)
-                    .gid(gid)
-                    .build();
-            linkNetworkStatsMapper.shortLinkNetworkState(linkNetworkStatsDO);
-
-            LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
-                    .ip(remoteAddr)
-                    .browser(browser)
-                    .os(os)
-                    .fullShortUrl(fullShortUrl)
-                    .gid(gid)
-                    .locale(StrUtil.join("-",country,province,city))
-                    .user(uv.get())
-                    .network(LinkUtil.getNetwork(request))
-                    .device(device)
-                    .build();
-            linkAccessLogsMapper.insert(linkAccessLogsDO);
-
-            LinkStatsTodayDO linkStatsTodayDO = LinkStatsTodayDO.builder()
-                    .gid(gid)
-                    .fullShortUrl(fullShortUrl)
-                    .date(new Date())
-                    .todayPv(1)
-                    .todayUv(uvFirstFlag.get() ? 1 : 0)
-                    .todayUip(uipFirstFlag ? 1 : 0)
-                    .build();
-            linkStatsTodayMapper.shortLinkTodayState(linkStatsTodayDO);
-        }catch (Exception e){
-            throw new ClientException("短链接访问数据统计异常");
+        Cookie[] cookies = ((HttpServletRequest) request).getCookies();
+        AtomicReference<String> uv = new AtomicReference<>();
+        Runnable addResponseCookieTask = () -> {
+            uv.set(UUID.fastUUID().toString());
+            Cookie uvCookie = new Cookie("uv", uv.get());
+            uvCookie.setMaxAge(60 * 60 * 24 * 30);
+            uvCookie.setPath(StrUtil.sub(fullShortUrl, fullShortUrl.indexOf("/"), fullShortUrl.length()));
+            ((HttpServletResponse) response).addCookie(uvCookie);
+            uvFirstFlag.set(Boolean.TRUE);
+            stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UV_KEY + fullShortUrl, uv.get());
+        };
+        if (ArrayUtil.isNotEmpty(cookies)) {
+            Arrays.stream(cookies)
+                    .filter(each -> Objects.equals(each.getName(), "uv"))
+                    .findFirst()
+                    .map(Cookie::getValue)
+                    .ifPresentOrElse(each -> {
+                        uv.set(each);
+                        Long uvAdded = stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UV_KEY + fullShortUrl, each);
+                        uvFirstFlag.set(uvAdded != null && uvAdded > 0L);
+                    }, addResponseCookieTask);
+        } else {
+            addResponseCookieTask.run();
         }
+        String remoteAddr = LinkUtil.getIp(((HttpServletRequest) request));
+        String os = LinkUtil.getOs(((HttpServletRequest) request));
+        String browser = LinkUtil.getBrowser(((HttpServletRequest) request));
+        String device = LinkUtil.getDevice(((HttpServletRequest) request));
+        String network = LinkUtil.getNetwork(((HttpServletRequest) request));
+        Long uipAdded = stringRedisTemplate.opsForSet().add(SHORT_LINK_STATS_UIP_KEY + fullShortUrl, remoteAddr);
+        boolean uipFirstFlag = uipAdded != null && uipAdded > 0L;
+        return ShortLinkStatsRecordDTO.builder()
+                .fullShortUrl(fullShortUrl)
+                .uv(uv.get())
+                .uvFirstFlag(uvFirstFlag.get())
+                .uipFirstFlag(uipFirstFlag)
+                .remoteAddr(remoteAddr)
+                .os(os)
+                .browser(browser)
+                .device(device)
+                .network(network)
+                .currentDate(new Date())
+                .build();
+    }
+
+    @SneakyThrows
+    private void shortLinkStats(String fullShortUrl, String gid, ShortLinkStatsRecordDTO statsRecord){
+        Map<String,String> producerMap = new HashMap<>();
+        producerMap.put("gid",gid);
+        producerMap.put("fullShortUrl",fullShortUrl);
+        producerMap.put("statsRecord",JSON.toJSONString(statsRecord));
+        shortLinkStatsSaveProducer.send(producerMap);
     }
 
     @Override

@@ -16,6 +16,9 @@ spring:
     redis:
       host: localhost
       port: 6379
+      channel-topic:
+        short-link-stats: 'short_link:stats-stream'
+        short-link-stats-group: 'short_link:stats-stream:only-group'
 
 shortlink:
   domain:
