@@ -20,12 +20,11 @@ import com.nageoffer.shortlink.project.common.convention.exception.ServiceExcept
 import com.nageoffer.shortlink.project.common.enums.ValiDateTypeEnum;
 import com.nageoffer.shortlink.project.dao.entity.*;
 import com.nageoffer.shortlink.project.dao.mapper.*;
+import com.nageoffer.shortlink.project.dto.req.ShortLinkBatchCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.nageoffer.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
-import com.nageoffer.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
-import com.nageoffer.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
-import com.nageoffer.shortlink.project.dto.resp.ShortLinkPageRespDTO;
+import com.nageoffer.shortlink.project.dto.resp.*;
 import com.nageoffer.shortlink.project.service.ShortLinkService;
 import com.nageoffer.shortlink.project.util.HashUtil;
 import com.nageoffer.shortlink.project.util.LinkUtil;
@@ -80,12 +79,13 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
     @Value("${shortlink.stats.locale.amap-key}")
     private String statsLocaleAmapKey;
 
-    private final String createShortLinkDefaultDomain = "http://anthony.cn";
+    @Value("${shortlink.domain.default}")
+    private String createShortLinkDefaultDomain;
 
     @Override
     public void restoreUrl(String shortUri, HttpServletRequest request, HttpServletResponse response) throws IOException {
         String serverName = request.getServerName();
-        String fullShortUrl = serverName + "/" + shortUri;
+        String fullShortUrl = serverName + ":8001" + "/" + shortUri;
         String originalUrl = stringRedisTemplate.opsForValue().get(String.format(GOTO_SHORT_LINK_KEY, fullShortUrl));
         if(StrUtil.isNotEmpty(originalUrl)){
             shortLinkStats(fullShortUrl,null,request,response);
@@ -312,9 +312,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
     public ShortLinkCreateRespDTO createShortLink(ShortLinkCreateReqDTO requestParam) {
         String shortLinkSuffix = generateSuffix(requestParam);
         ShortLinkDO shortLinkDO = BeanUtil.toBean(requestParam, ShortLinkDO.class);
-        String fullShortUrl = requestParam.getDomain() + "/" + shortLinkSuffix;
+        String fullShortUrl = createShortLinkDefaultDomain +":8001" + "/" + shortLinkSuffix;
 
-        shortLinkDO.setFullShortUrl(fullShortUrl);
+        shortLinkDO.setDomain(createShortLinkDefaultDomain+":8001");
+        shortLinkDO.setOriginUrl(requestParam.getOriginUrl());
+        shortLinkDO.setFullShortUrl(createShortLinkDefaultDomain+":8001" + "/" +shortLinkSuffix);
         shortLinkDO.setShortUri(shortLinkSuffix);
         shortLinkDO.setDelFlag(0);
         shortLinkDO.setDelTime(0L);
@@ -421,7 +423,14 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                         .favicon(hasShortLinkDO.getFavicon())
                         .build();
                 baseMapper.update(shortLinkDO,updateWrapper);
-            }else{
+                //如果有效期变了,需要设置缓存过期时间
+            if(shortLinkDO.getValidDateType() == ValiDateTypeEnum.CUSTOM.getType()){
+                Date validDate = shortLinkDO.getValidDate();
+                long nowMillis = System.currentTimeMillis();
+                long validSeconds = validDate.getTime() - nowMillis;
+                stringRedisTemplate.expire(String.format(GOTO_SHORT_LINK_KEY,shortLinkDO.getFullShortUrl()) ,Math.abs(validSeconds),TimeUnit.MILLISECONDS);
+            }
+        }else{
                 //gid变了,涉及到分片切换,写的过程中阻塞别的线程获取读锁和写锁
             RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(LOCK_GID_UPDATE_KEY,requestParam.getFullShortUrl()));
             RLock rLock = readWriteLock.writeLock();
@@ -440,7 +449,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
                         .build();
                 baseMapper.update(delShortLinkDO,linkUpdateWrapper);
                 ShortLinkDO shortLinkDO = ShortLinkDO.builder()
-                        .domain(createShortLinkDefaultDomain)
+                        .domain(createShortLinkDefaultDomain + ":8001")
                         .originUrl(requestParam.getOriginUrl())
                         .gid(requestParam.getGid())
                         .createdType(hasShortLinkDO.getCreatedType())
@@ -463,5 +472,33 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
             }
         }
     }
+
+    @Override
+    public ShortLinkBatchCreateRespDTO batchCreateShortLink(ShortLinkBatchCreateReqDTO requestParam) {
+        List<String> originUrls = requestParam.getOriginUrls();
+        List<String> describes = requestParam.getDescribes();
+        List<ShortLinkBaseInfoRespDTO> result = new ArrayList<>();
+        for (int i = 0; i < originUrls.size(); i++) {
+            ShortLinkCreateReqDTO shortLinkCreateReqDTO = BeanUtil.toBean(requestParam, ShortLinkCreateReqDTO.class);
+            shortLinkCreateReqDTO.setOriginUrl(originUrls.get(i));
+            shortLinkCreateReqDTO.setDescription(describes.get(i));
+            try {
+                ShortLinkCreateRespDTO shortLink = createShortLink(shortLinkCreateReqDTO);
+                ShortLinkBaseInfoRespDTO linkBaseInfoRespDTO = ShortLinkBaseInfoRespDTO.builder()
+                        .fullShortUrl(shortLink.getFullShortUrl())
+                        .originUrl(shortLink.getOriginUrl())
+                        .describe(describes.get(i))
+                        .build();
+                result.add(linkBaseInfoRespDTO);
+            } catch (Throwable ex) {
+                log.error("批量创建短链接失败，原始参数：{}", originUrls.get(i));
+            }
+        }
+        return ShortLinkBatchCreateRespDTO.builder()
+                .total(result.size())
+                .baseLinkInfos(result)
+                .build();
+    }
+
 
 }

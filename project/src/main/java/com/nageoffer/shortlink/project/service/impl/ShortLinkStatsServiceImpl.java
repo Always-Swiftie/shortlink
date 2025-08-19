@@ -63,6 +63,7 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
     @Override
     public ShortLinkStatsRespDTO oneShortLinkStats(ShortLinkStatsReqDTO requestParam) {
 //        checkGroupBelongToUser(requestParam.getGid());
+        requestParam.setEnableStatus(0);
         List<LinkAccessStatsDO> listStatsByShortLink = linkAccessStatsMapper.listStatsByShortLink(requestParam);
         if (CollUtil.isEmpty(listStatsByShortLink)) {
             return null;

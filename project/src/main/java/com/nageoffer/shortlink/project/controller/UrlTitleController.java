@@ -25,12 +25,12 @@ public class UrlTitleController {
      * @param url
      * @return
      */
-    @GetMapping("/api/shortlink/v1/title")
+    @GetMapping("/api/short-link/v1/title")
     public Result<String> getTitleByUrl(@RequestParam String url) throws IOException {
         return Results.success(urlTitleService.getTitleByUrl(url));
     }
 
-    @GetMapping("/api/shortlink/v1/title/remote")
+    @GetMapping("/api/short-link/v1/title/remote")
     public String getTitleByUrlRemote(@RequestParam String url) throws IOException {
         return urlTitleService.getTitleByUrl(url);
     }

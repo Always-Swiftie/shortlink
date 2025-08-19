@@ -31,7 +31,6 @@ public class ShortLinkCreateReqDTO {
      * 分组标识
      */
     private String gid;
-
     /**
      * 创建类型 0：控制台 1：接口
      */

@@ -29,9 +29,9 @@ public class UserTransmitInterceptor implements HandlerInterceptor {
 
     // 忽略校验的路径
     private static final List<String> IGNORE_URI = List.of(
-            "/api/shortlink/v1/admin/user/login",
-            "/api/shortlink/v1/admin/user/has-username",
-            "/api/shortlink/v1/admin/user" // POST 创建用户的场景
+            "/api/short-link/admin/v1/user/login",
+            "/api/short-link/admin/v1/user/has-username",
+            "/api/short-link/admin/v1/user" // POST 创建用户的场景
     );
 
     @Override
@@ -41,7 +41,7 @@ public class UserTransmitInterceptor implements HandlerInterceptor {
         String method = request.getMethod();
 
         // 忽略的 URI
-        if (shouldIgnore(requestURI, method)) {
+        if (shouldIgnore(requestURI, method) || requestURI.equals("/api/short-link/admin/v1/user/login")) {
             return true;
         }
 
@@ -72,7 +72,7 @@ public class UserTransmitInterceptor implements HandlerInterceptor {
     private boolean shouldIgnore(String uri, String method) {
         return IGNORE_URI.stream().anyMatch(ignorePath ->
                 pathMatcher.match(ignorePath, uri) &&
-                        !(ignorePath.equals("/api/shortlink/admin/v1/user") && !"POST".equalsIgnoreCase(method))
+                        !(ignorePath.equals("/api/short-link/admin/v1/user") && !"POST".equalsIgnoreCase(method))
         );
     }
 }

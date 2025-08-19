@@ -18,6 +18,9 @@ spring:
       port: 6379
 
 shortlink:
+  domain:
+    default: 127.0.0.1
+
   stats:
     locale:
      amap-key: 5c751e03e1dcbf85fb797c752ee09ff3

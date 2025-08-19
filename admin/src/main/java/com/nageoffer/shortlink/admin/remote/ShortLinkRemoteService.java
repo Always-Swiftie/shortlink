@@ -10,10 +10,7 @@ import com.nageoffer.shortlink.admin.common.convention.result.Result;
 import com.nageoffer.shortlink.admin.dto.req.RecycleBinPageReqDTO;
 import com.nageoffer.shortlink.admin.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.*;
-import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
-import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
-import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkStatsAccessRecordRespDTO;
-import com.nageoffer.shortlink.admin.remote.dto.resp.ShortLinkStatsRespDTO;
+import com.nageoffer.shortlink.admin.remote.dto.resp.*;
 import org.springframework.context.annotation.Bean;
 
 import java.io.IOException;
@@ -33,7 +30,7 @@ public interface ShortLinkRemoteService {
      * @return 创建响应
      */
     default Result<ShortLinkCreateRespDTO> createShortLink(ShortLinkCreateReqDTO requestParam){
-        String resultBodyStr = HttpUtil.post("http://127.0.0.1:8001/api/shortlink/v1/create", JSON.toJSONString(requestParam));
+        String resultBodyStr = HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/create", JSON.toJSONString(requestParam));
         return JSON.parseObject(resultBodyStr, new TypeReference<>(){});
     }
 
@@ -48,7 +45,7 @@ public interface ShortLinkRemoteService {
         requestMap.put("current",requestParam.getCurrent());
         requestMap.put("size",requestParam.getSize());
         requestMap.put("orderTag",requestParam.getOrderTag());
-        String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/page", requestMap);
+        String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/page", requestMap);
         Result<IPage<ShortLinkPageRespDTO>> resultObj =
                 JSON.parseObject(resultPageStr, new TypeReference<Result<IPage<ShortLinkPageRespDTO>>>() {});
         return resultObj.getData();
@@ -61,7 +58,7 @@ public interface ShortLinkRemoteService {
     default List<ShortLinkGroupCountQueryRespDTO> listGroupShortLinkCount(List<String> requestParam){
         Map<String,Object> requestMap = new HashMap<>();
         requestMap.put("requestParam",requestParam);
-        String resultJsonStr = HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/count/remote", requestMap);
+        String resultJsonStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/count/remote", requestMap);
         return JSON.parseArray(resultJsonStr, ShortLinkGroupCountQueryRespDTO.class);
     }
 
@@ -71,7 +68,7 @@ public interface ShortLinkRemoteService {
      */
     default void updateShortLink(ShortLinkUpdateReqDTO requestParam){
         System.out.println(requestParam.getOriginGid());
-        String resultJsonStr = HttpUtil.post("http://127.0.0.1:8001/api/shortlink/v1/update", JSON.toJSONString(requestParam));
+        String resultJsonStr = HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/update", JSON.toJSONString(requestParam));
     }
 
     /**
@@ -80,14 +77,14 @@ public interface ShortLinkRemoteService {
      * @return 网站图片
      */
     default String getTitleByUrl(String url) throws IOException{
-        return HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/title/remote?url=" + url);
+        return HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/title/remote?url=" + url);
     }
 
     /** 保存短链接到回收站
      * @param requestParam 请求参数
      */
     default void saveRecycleBin(RecycleBinSaveReqDTO requestParam){
-        HttpUtil.post("http://127.0.0.1:8001/api/shortlink/v1/recyclebin/save",JSON.toJSONString(requestParam));
+        HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/recyclebin/save",JSON.toJSONString(requestParam));
     }
 
     /**
@@ -100,7 +97,7 @@ public interface ShortLinkRemoteService {
         requestMap.put("gidList",requestParam.getGidList());
         requestMap.put("current",requestParam.getCurrent());
         requestMap.put("size",requestParam.getSize());
-        String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/recyclebin/page", requestMap);
+        String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/recyclebin/page", requestMap);
         Result<IPage<ShortLinkPageRespDTO>> resultObj =
                 JSON.parseObject(resultPageStr, new TypeReference<Result<IPage<ShortLinkPageRespDTO>>>() {});
         return resultObj.getData();
@@ -111,7 +108,7 @@ public interface ShortLinkRemoteService {
      * @param requestParam 请求参数
      */
     default void recoverRecycleBin(RecycleBinRecoverReqDTO requestParam){
-        HttpUtil.post("http://127.0.0.1:8001/api/shortlink/v1/recyclebin/recover",JSON.toJSONString(requestParam));
+        HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/recyclebin/recover",JSON.toJSONString(requestParam));
     }
 
     /**
@@ -119,7 +116,7 @@ public interface ShortLinkRemoteService {
      * @param requestParam 请求参数
      */
     default void removeRecycleBin(RecycleBinRemoveReqDTO requestParam){
-        HttpUtil.post("http://127.0.0.1:8001/api/shortlink/v1/recyclebin/remove",JSON.toJSONString(requestParam));
+        HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/recyclebin/remove",JSON.toJSONString(requestParam));
     }
 
     /**
@@ -132,7 +129,7 @@ public interface ShortLinkRemoteService {
         requestMap.put("enableStatus",enableStatus);
         requestMap.put("startDate",startDate);
         requestMap.put("endDate",endDate);
-        String resultBodyStr = HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/stats", requestMap);
+        String resultBodyStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/stats", requestMap);
         return JSON.parseObject(resultBodyStr, new TypeReference<>(){});
     }
 
@@ -141,7 +138,7 @@ public interface ShortLinkRemoteService {
         requestMap.put("gid",gid);
         requestMap.put("startDate",startDate);
         requestMap.put("endDate",endDate);
-        String resultBodyStr = HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/stats/group", requestMap);
+        String resultBodyStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/stats/group", requestMap);
         return JSON.parseObject(resultBodyStr, new TypeReference<>(){});
     }
 
@@ -157,7 +154,7 @@ public interface ShortLinkRemoteService {
         requestMap.put("endDate",endDate);
         requestMap.put("current",current);
         requestMap.put("size",size);
-        String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/shortlink/v1/stats/access-record",requestMap);
+        String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/stats/access-record",requestMap);
         return JSON.parseObject(resultPageStr, new TypeReference<>(){});
     }
 
@@ -170,5 +167,15 @@ public interface ShortLinkRemoteService {
         requestMap.put("size",size);
         String resultPageStr = HttpUtil.get("http://127.0.0.1:8001/api/short-link/v1/stats/access-record/group",requestMap);
         return JSON.parseObject(resultPageStr, new TypeReference<>(){});
+    }
+
+    /**
+     * 批量创建短链接
+     * @param requestParam 批量创建参数
+     * @return 批量创建返回参数
+     */
+    default Result<ShortLinkBatchCreateRespDTO> batchCreateShortLink(ShortLinkBatchCreateReqDTO requestParam){
+        String resultBodyStr = HttpUtil.post("http://127.0.0.1:8001/api/short-link/v1/create/batch", JSON.toJSONString(requestParam));
+        return JSON.parseObject(resultBodyStr, new TypeReference<>(){});
     }
 }
